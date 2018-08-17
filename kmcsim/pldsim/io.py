@@ -32,7 +32,7 @@ def read_cfg(file_name):
         for i in range(nat):
             xyz.append(np.array([int(l) for l in re.findall('\S+', f.readline())[1:]]))
 
-    return xyz, box
+    return lat_type, box, xyz
 
 def write_cfg(file_name, xyz, box, grain):
     """Write output configuration to xyz file"""

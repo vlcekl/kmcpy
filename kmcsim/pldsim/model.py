@@ -12,10 +12,13 @@ import re
 import numpy as np
 from itertools import product
 from collections import Counter
+#import events
 from .events import EventTree
 
-class KMCMove:
+class KMCModel:
     """Class managing kmc moves and event modifications"""
+
+    Rs = 1.0 # top node / sum of all rates
 
     def __init__(self, latt_type):
         self.latt_type = latt_type
@@ -71,9 +74,10 @@ class KMCMove:
             latt[tuple(r)] = i
     
         self.latt = latt
-        self.xyz = xyz
         self.box = box
-        self.grain = [0 for i in range(len(xyz))]
+        self.xyz = xyz
+        self.nat = len(self.xyz)
+        self.grain = [0 for i in range(self.nat)]
 
     def make_event_list(self, rates):
  
@@ -109,15 +113,19 @@ class KMCMove:
         self.event_list =  event_list
         #print('event_list', len(event_list))
 
-        return event_list
+        # Create an initial event tree
+        self.etree = EventTree()
+        self.etree.build_tree(event_list)
+
 
     def move(self, event, i):
         """
-        Perform kmc move given by an event (depsotions or diffusion)
+        Perform kmc move given by an event (deposition or diffusion)
         and update event list
         """
 
-        if event['type'] == 0: # deposition
+        #if event['type'] == 0: # deposition
+        if True:
             search = True
             while search:
                 # choose x-y position
@@ -163,7 +171,7 @@ class KMCMove:
             # grain number for each atom
             self.grain.append(g_number)
 
-            print('top atom', ri, ix, iy, iz)
+            #print('top atom', ri, ix, iy, iz)
 
         else: # diffusion
             # cycle over list of surface atoms and their diffusion events
@@ -188,7 +196,7 @@ class KMCMove:
                     diffusion_directions.append(dr)
 
             if len(diffusion_directions) > 0:
-                print('diff', diffusion_directions)
+                #print('diff', diffusion_directions)
                 #diff_dir = np.random.choice(np.array(diffusion_directions)) 
 
                 diff_dir = diffusion_directions[np.random.randint(len(diffusion_directions))]
@@ -233,6 +241,8 @@ class KMCMove:
 
         # new atom position effect on events
 
+        self.nat = len(self.xyz)
+
         old_events = []
         new_events = []
 
@@ -241,69 +251,44 @@ class KMCMove:
     def get_conf(self):
         return self.xyz, self.box, self.grain
 
+    def advance_time(self):
+        """
+        Time step of the last event and reset total rates
 
-if __name__ == "__main__":
+        Returns
+        -------
+        dt : float
+             Time of the latest event
+        """
 
-    # read simulation parameters
-    with open(sys.argv[1], 'r') as f:
+        dt = -np.log(np.random.random())/self.Rs
 
-        # time limit (ms)
-        t_max = float(re.findall('\S+', f.readline())[1])
+        self.Rs = self.etree.get_topnode()
 
-        # input configuration file
-        incfg_file = re.findall('\S+', f.readline())[1]
+        return dt
 
-        # kmx parameter file - rates (1/ms)
-        pars_file = re.findall('\S+', f.readline())[1]
-
-    # read input configuration file and make lattice
-    xyz, box = read_cfg(incfg_file)
-    kmc = KMCMove('fcc')
-    kmc.make_lattice(xyz, box)
-
-    # read read kmx parameters
-    rates = read_pars(pars_file)
-
-    # make event list (e.g., identify deposition sites)
-    event_list = kmc.make_event_list(rates)
-
-    # Create an initial event tree
-    etree = EventTree()
-    etree.build_tree(event_list)
-
-    # start main loop
-    np.random.seed(42)
-    t = 0.0
-    while t < t_max:
-        # sum of event rates
-        Rs = etree.get_topnode()
-        #print(Rs)
+    def step(self):
+        """
+        Perform a KMC step.
+        """
 
         # generate a random number [0,Rs)
-        q = Rs*np.random.random()
-
+        q = self.Rs*np.random.random()
+ 
         # find next event to occurr
-        event, i = etree.find_event(q)
-        #print('event', event, i)
+        event, i = self.etree.find_event(q)
 
+        print('event', event['type'], event['rate'], i, q)
+ 
         # perform event and get new events
-        old_events, new_events = kmc.move(event, i)
-
+        old_events, new_events = self.move(event, i)
+ 
         # update binary search tree
-        etree.update_tree(old_events, new_events)
-
+        self.etree.update_tree(old_events, new_events)
+ 
         # if deposition event, check if a new layer is complete
         #if event_i['type'] == 0:
         #    atoms = check_layer()
         #    if len(atoms) > 0:
-        #        etree.rebalance_tree(atoms)
+        #        self.etree.rebalance_tree(atoms)
 
-        # advance time
-        t += -np.log(np.random.random())/Rs
-
-        print('time:', t)
-
-    xyz, box, grain = kmc.get_conf()
-    write_cfg('output.xyz', xyz, box, grain)
-
-# end of kmc_pld.py 

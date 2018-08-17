@@ -24,7 +24,7 @@ def make_fcc(box):
 
     latt = {}
     latt['nat'] = lx*ly*lz
-    latt['box'] = ('fcc', 2*lx, ly, lz)
+    latt['box'] = ['fcc', 2*lx, ly, lz]
     latt['xyzs'] = []
 
     # box dimensions in lattice units

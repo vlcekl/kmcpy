@@ -1,3 +1,3 @@
 # KMC simulation tool
 
-Simulate pulsed layer deposition (PLD)
+Simulation of pulsed layer deposition (PLD)
