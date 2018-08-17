@@ -49,11 +49,17 @@ class KMCMove:
 
     def make_lattice(self, xyz, box):
     
-        # create simulation box (fill with -1, e.g., no atoms)
-        latt = -np.ones((tuple(box)), dtype=int)
+        # create simulation box (fill with -10, e.g., not and FCC site)
+        latt = -10*np.ones((tuple(box)), dtype=int)
+
+        # cycle through lattice sites and mark FCC sites with -1
+        for r in product(range(box[0]), range(box[1]), range(box[2])):
+            if sum(r) % 2 == 0:
+                latt[tuple(r)] = -1
     
         # fill box with atoms
         for i, r in enumerate(xyz):
+            assert sum(r) % 2 == 0, f'{r} Atom not on FCC lattice!'
             latt[tuple(r)] = i
     
         # set -2 to empty sites available for adsorption
@@ -80,7 +86,7 @@ class KMCMove:
  
         event_list = []
 
-        # deposition events
+        # event 0, deposition event, number equal to the x-y area
         for r in product(range(self.box[0]), range(self.box[1]), range(self.box[2])):
             if self.latt[r] == -2:
                 event = {}
@@ -110,16 +116,37 @@ class KMCMove:
 
         return event_list
 
-    def move(self, event):
-        """Perform kmc move given by an event (depsotions or diffusion)"""
+    def move(self, event, i):
+        """
+        Perform kmc move given by an event (depsotions or diffusion)
+        and update event list
+        """
 
         if event['type'] == 0: # deposition
             # create a new atom on a lattice
-            self.xyz.append(event['new'])
-            latt[tuple(self.xyz[-1][:3])] = len(self.xyz)-1 # atom number
+            self.xyz.append(event['new']) # atom position
+            self.latt[tuple(self.xyz[-1])] = len(self.xyz)-1 # atom number to lattice
+
+
+            # find affected old events (deleted deposition site)
+
         #else: # diffusion
             
-        return new_state
+        # for atom i in final position ri:
+        # change deposition site event for ri
+        # find neighboring atoms or deposition sites
+        for dr in self.nbrlist:
+            rj = (ri + dr) % self.box
+            if self.latt[r] == -2:
+                event = {}
+                event['atom'] = i
+                event['current'] = ri
+                event['new'] = rj
+                event['type'] = 1
+                event['rate'] = rates[1]
+                event_list.append(event)
+
+        return old_events, new_events
 
         
 
@@ -199,9 +226,9 @@ class EventTree:
         
         # bottom level - return selected event
         if q < self.t[0][j]:
-            return self.events[j]
+            return self.events[j], j
         else:
-            return self.events[j+1]
+            return self.events[j+1], j+1
 
 
 def read_cfg(file_name):
@@ -280,14 +307,14 @@ if __name__ == "__main__":
         q = Rs*np.random.random()
 
         # find next event to occurr
-        event_i = etree.find_event(q)
+        event, i = etree.find_event(q)
         print('event', event_i)
 
         # perform event and get new events
-        new_state = move(event_i)
+        old_events, new_events = kmc.move(event, i)
 
         # update binary search tree
-        etree.update_tree(new_state)
+        etree.update_tree(old_events, new_events)
 
         # if deposition event, check if a new layer is complete
         if event_i['type'] == 0:
