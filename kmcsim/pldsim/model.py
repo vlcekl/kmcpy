@@ -79,7 +79,7 @@ class KMCModel:
         self.nat = len(self.xyz)
         self.grain = [0 for i in range(self.nat)]
 
-    def make_event_list(self, rates):
+    def init_events(self, rates):
  
         event_list = []
 
@@ -111,11 +111,13 @@ class KMCModel:
                     event_list.append(event)
 
         self.event_list =  event_list
-        #print('event_list', len(event_list))
 
-        # Create an initial event tree
-        self.etree = EventTree()
-        self.etree.build_tree(event_list)
+
+        # Initiate event data structures
+        self.etree = EventTree(rates)
+
+        # Initial filling of the data structures with events
+        self.etree.update_events([], self.event_list)
 
 
     def move(self, event, i):
@@ -284,11 +286,5 @@ class KMCModel:
         old_events, new_events = self.move(event, i)
  
         # update binary search tree
-        self.etree.update_tree(old_events, new_events)
+        self.etree.update_events(old_events, new_events)
  
-        # if deposition event, check if a new layer is complete
-        #if event_i['type'] == 0:
-        #    atoms = check_layer()
-        #    if len(atoms) > 0:
-        #        self.etree.rebalance_tree(atoms)
-

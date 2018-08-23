@@ -15,8 +15,17 @@ class EventTree:
     and arrays for choosing specific event. 
     """
 
-    def __init__(self):
+    def __init__(self, rates):
+
+        # list of rates
+        self.rates = rates
+
+        # empty event type tree
         self.t = []
+
+        # empty event id (list of lists)
+        self.eid = [[] for _ in range(len(rates))]
+
 
     def build_tree(self, events):
         # save events internally
@@ -42,33 +51,15 @@ class EventTree:
         #print('tree', self.t)
 
     def get_topnode(self):
-        #print('topnode', self.t[-1])
         return self.t[-1]
 
-    # print the 'tree' values by levels
-    def print_tree(self):
-        print('Number of levels (K):', len(self.t))
-        print('Number of events:', len(self.t[0]))
-        for i, level in enumerate(self.t):
-            print('Level:', i)
-            print(*level)
 
-    def update_tree(self, new_events, old_events):
-        """Update tree after an event"""
+    def update_events(self, old_events, new_events):
+        """
+        Update tree: remove old events and add new events
+        """
         pass
 
-
-    def rebalance_tree(self, atoms):
-        """
-            Remove events related to selected atoms (e.g., layer is filled)
-            and rebuild the event tree
-        """
-
-        # compile a new list of events
-        self.events = [e for e in self.events if e['atom'] not in atoms]
-
-        # rebuild the tree
-        self.build_tree(new_events)
 
     def find_event(self, q):
         """Find and return an event"""

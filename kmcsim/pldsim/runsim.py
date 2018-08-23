@@ -73,7 +73,7 @@ class RunSim:
             self.stats_file = os.path.join(path, re.findall('\S+', f.readline())[-1])
 
 
-    def initsim(self):
+    def init_sim(self):
         """
         Initialize KMC simulation: build model and set its parameters
         """
@@ -89,7 +89,7 @@ class RunSim:
         rates = read_pars(self.param_file)
 
         # make event list (e.g., identify deposition sites)
-        self.kmc.make_event_list(rates)
+        self.kmc.init_events(rates)
 
 
     def run(self, random_seed=42):
@@ -98,10 +98,7 @@ class RunSim:
         """
 
         # initial values
-        t = 0.0
-        t_print_old = 0.0
-        t_save_old = 0.0
-        t_measure_old = 0.0
+        t = t_print = t_save = t_measure = 0.0
         it = 0
 
         # print initial numbers
@@ -118,15 +115,15 @@ class RunSim:
             it += 1
 
             # perform runtime outputs
-            if (t - t_print_old) > self.print_period:
+            if (t - t_print) > self.print_period:
                 print(t, it, self.kmc.nat)
-                t_print_old = t
+                t_print = t
 
-            if (t - t_save_old) > self.save_traj_period:
-                t_save_old = t
+            if (t - t_save) > self.save_traj_period:
+                t_save = t
 
-            if (t - t_measure_old) > self.measure_period:
-                t_measure_old = t
+            if (t - t_measure) > self.measure_period:
+                t_measure = t
 
         if (self.print_period < self.t_max):
             print('End of simulation')
@@ -148,7 +145,7 @@ if __name__ == "__main__":
 
     sim.read(sys.argv[0])
 
-    sim.initsim()
+    sim.init_sim()
 
     sim.run()
 
