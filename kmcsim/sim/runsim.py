@@ -85,11 +85,12 @@ class RunSim:
         self.kmc = KMCModel(lat_type)
         self.kmc.make_lattice(xyz, box)
 
-        # read read parameters reaction rates
+        # read kMC parameters (reaction rates)
         rates = read_pars(self.param_file)
 
         # make event list (e.g., identify deposition sites)
         self.kmc.init_events(rates)
+
 
 
     def run(self, random_seed=42):

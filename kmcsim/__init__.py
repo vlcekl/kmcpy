@@ -6,4 +6,4 @@ name = "kmcsim"
 
 __version__ = '0.0.1'
 
-from kmcsim import pldsim, buildtools
+from kmcsim import sim, buildtools

@@ -27,8 +27,9 @@ class KMCModel:
     def __setup_neighbors(self):
         """Create lists of neighboring (nn & nnn) sites"""
 
+        nbrlist = []
+
         if self.latt_type == 'fcc':
-            nbrlist = []
             # NNN
             nbrlist.append(np.array([ 2, 0, 0]))
             nbrlist.append(np.array([-2, 0, 0]))
@@ -57,26 +58,28 @@ class KMCModel:
 
     def make_lattice(self, xyz, box):
         """
-        Set up representation of the simulation box 
+        Set up site lables on FCC lattice
         """
     
         # create simulation box (fill with -10, e.g., not and FCC site)
-        latt = -10*np.ones((tuple(box)), dtype=int)
+        latt = -1*np.ones((tuple(box)), dtype=int)
 
-        # cycle through lattice sites and mark FCC sites with -1
+        # cycle through lattice sites and mark FCC sites with 0 (empty site)
         for r in product(range(box[0]), range(box[1]), range(box[2])):
             if sum(r) % 2 == 0:
-                latt[tuple(r)] = -1
+                latt[tuple(r)] = 0
     
         # fill box with atoms
         for i, r in enumerate(xyz):
             assert sum(r) % 2 == 0, f'{r} Atom not on FCC lattice!'
-            latt[tuple(r)] = i
+            latt[tuple(r)] = i+1
     
         self.latt = latt
         self.box = box
         self.xyz = xyz
         self.nat = len(self.xyz)
+
+        # Set grain number of the substrate to 0
         self.grain = [0 for i in range(self.nat)]
 
     def init_events(self, rates):
@@ -84,15 +87,34 @@ class KMCModel:
         event_list = []
 
         # Deposition event
-        event = {}
-        event['type'] = 0
-        # single rate times number of surface atomic sites
-        event['rate'] = rates[0]*self.box[0]*self.box[1]
-        event['atom'] = None
-        event['current'] = None
-        event['new'] = None
+        # find sites available for deposition
+        # contains at least three neighbors underneath
 
-        event_list.append(event)
+        # explore or surface sites in the x-y plane
+        for ix, iy in product(range(self.box[0]), range(self.box[1])):
+
+            # find z position
+            for iz in range(self.box[2]):
+                if self.latt[ix, iy, iz] == -1:
+                    ri = np.array([ix, iy, iz], dtype=int)
+
+                    # search neighbors (needs at least 3)
+                    neighbors = 0
+                    for dr in self.nbrlist:
+                        rj = (ri + dr) % self.box
+                        iatom = self.latt[tuple(rj)]
+                        if iatom > -1:
+                            neighbors += 1
+
+                    # if 3 or more neighbors beneath, create a deposition
+                    # event target
+                    if neighbors > 2:
+                        event = {'type':0, 'rate': rates[0]}
+                        event['atom'] = None
+                        event['initial'] = None
+                        event['final'] = [ix, iy, iz]
+
+                        event_list.append(event)
 
         # diffusion events
         for i, ri in enumerate(self.xyz):
@@ -104,20 +126,20 @@ class KMCModel:
                 if self.latt[tuple(rj)] == -1:
                     event = {}
                     event['atom'] = i
-                    event['current'] = ri
-                    event['new'] = rj
+                    event['initial'] = ri
+                    event['final'] = rj
                     event['type'] = 1
                     event['rate'] = rates[1]
                     event_list.append(event)
 
         self.event_list =  event_list
 
-
         # Initiate event data structures
         self.etree = EventTree(rates)
 
         # Initial filling of the data structures with events
-        self.etree.update_events([], self.event_list)
+        self.etree.build_tree(self.event_list)
+        #self.etree.update_events([], self.event_list)
 
 
     def move(self, event, i):
@@ -226,22 +248,6 @@ class KMCModel:
                 
                 # grain number for each atom
                 self.grain[iatom] = g_number
-
-        # for atom i in final position ri:
-        # change deposition site event for ri
-        # find neighboring atoms or deposition sites
-        #for dr in self.nbrlist:
-        #    rj = (ri + dr) % self.box
-        #    if self.latt[r] == -2:
-        #        event = {}
-        #        event['atom'] = i
-        #        event['current'] = ri
-        #        event['new'] = rj
-        #        event['type'] = 1
-        #        event['rate'] = rates[1]
-        #        event_list.append(event)
-
-        # new atom position effect on events
 
         self.nat = len(self.xyz)
 
