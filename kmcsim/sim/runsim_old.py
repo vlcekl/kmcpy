@@ -109,9 +109,9 @@ class RunSim:
 
         while t < self.t_max:
 
-            t += self.kmc.advance_time()
-
             self.kmc.step()
+
+            t += self.kmc.advance_time()
 
             it += 1
 

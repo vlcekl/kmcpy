@@ -18,6 +18,8 @@ from .events import EventTree
 class KMCModel:
     """Class managing kmc moves and event modifications"""
 
+    Rs = 1.0 # top node / sum of all rates
+
     def __init__(self, latt_type):
         self.latt_type = latt_type
         self.__setup_neighbors()
@@ -116,9 +118,8 @@ class KMCModel:
 
     def init_events(self, rates):
  
-        rates = np.array(rates)
-
-        event_list = [[] for _ in range(rates.shape[0])]
+        print('rates', rates, len(self.xyz), self.box)
+        event_list = []
 
         # Deposition event
         # find sites available for deposition
@@ -137,11 +138,12 @@ class KMCModel:
 
                     # if 3 or more nearest neighbors create a deposition event
                     if len(neighbors) > 2:
-                        event = {'type':0}
+                        event = {'type':0, 'rate': rates[0]}
                         event['atom'] = None
                         event['initial'] = None
                         event['final'] = [ix, iy, iz]
-                        event_list[0].append(event)
+
+                        event_list.append(event)
 
                     break
 
@@ -162,30 +164,27 @@ class KMCModel:
 
                     # if 3 or more nearest neighbors create a diffusion event
                     if len(neighbors) > 2:
-                        event = {'type':1}
+                        event = {}
                         event['atom'] = i
                         event['initial'] = ri
                         event['final'] = rj
-                        event_list[1].append(event)
+                        event['type'] = 1
+                        event['rate'] = rates[1]
+                        event_list.append(event)
 
         self.event_list =  event_list
 
-        # Get dictionary of event type counts
-        n_events = np.array([len(e) for e in self.event_list])
-        print('Number of events:', n_events)
-
         # Initiate event data structures
-        self.etree = EventTree(rates)
-        self.etree.update_events(n_events)
+        self.etree = EventTree(rates, event_list)
 
-        print('events',len(event_list), np.random.choice(np.random.choice(event_list, 2), 5))
+        print('events',len(event_list), np.random.choice(event_list, 5))
         print(self.etree.event_tree[-1])
         print('-------')
-        print([[(e['type'], e['final']) for e in et] for et in event_list])
+        print([(e['type'], e['final']) for e in event_list])
         print('-------')
 
 
-    def move(self, event_type, event_number):
+    def move(self, event):
         """
         Perform kmc move given by an event (deposition or diffusion)
         and update event list
@@ -274,7 +273,6 @@ class KMCModel:
     def get_conf(self):
         return self.xyz, self.box, self.grain
 
-
     def advance_time(self):
         """
         Time step of the last event and reset total rates
@@ -285,7 +283,10 @@ class KMCModel:
              Time of the latest event
         """
 
-        dt = -np.log(np.random.random())/self.etree.Rs
+        dt = -np.log(np.random.random())/self.Rs
+
+        # Save current overall rate (stored in the last node of event tree)
+        self.Rs = self.etree.event_tree[-1]
 
         return dt
 
@@ -296,11 +297,11 @@ class KMCModel:
         """
 
         # return a random event
-        event_type, event_number = self.etree.find_event()
+        event = self.etree.find_event()
 
         # perform a step prescribed by the event and return lists of affected events
-        n_events = self.move(event_type, event_number)
+        old_events, new_events = self.move(event)
  
         # update binary search tree
-        self.etree.update_events(n_events)
+        self.etree.update_events(old_events, new_events)
  
