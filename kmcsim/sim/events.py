@@ -67,8 +67,8 @@ class EventTree:
         assert len(n_events) == len(self.rates), 'Rates and n_event lists do not match'
 
         # if no changes, return
-        if np.array_equal(self.n_events, n_events):
-            return
+        #if np.array_equal(self.n_events, n_events):
+        #    return
 
         self.n_events[:] = n_events
 
@@ -81,12 +81,15 @@ class EventTree:
 
         self.Rs = self.event_tree[-1][0]
 
-        for i, t in enumerate(self.event_tree):
-            print('tree level', i, t)
+        #for i, t in enumerate(self.event_tree):
+        #    print('tree level', i, t)
 
 
     def find_event(self):
         """Find and return an event"""
+
+        #for i, t in enumerate(self.event_tree):
+        #    print('tree level runtime', i, t)
 
         # generate a random number [0,Rs)
         q = self.Rs*np.random.random()
@@ -107,8 +110,11 @@ class EventTree:
         
         event_type = j
 
+
         # select a random event index of a given type 
         event_number = np.random.randint(self.n_events[event_type])
+        #print('event tree:', event_type, event_number)
+
 
         return event_type, event_number
 

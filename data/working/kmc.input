@@ -1,4 +1,4 @@
-time: 30.0
+time: 1.0
 print_period: 10.0
 save_traj_period: 10.0
 param_file: params

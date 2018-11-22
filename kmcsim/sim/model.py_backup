@@ -123,7 +123,7 @@ class KMCModel:
 
         # vacancy, test for possibility of deposition event
         if iatom == 0:
-           # rj = np.array(rj, dtype=int)
+            rj = np.array(rj, dtype=int)
 
             # count number of atomic neighbors in the target position
             _, grain_numbers_j = self.find_neighbors(rj)
@@ -148,8 +148,8 @@ class KMCModel:
 
                     # if number of real atoms 3 or more, make vacancy available as
                     # a destination for deposition and diffusion
-                    if len(grain_numbers_k)-1 > 2:
-                        events_found.append((1, j, rj, rk))
+                    if len(grain_numbers_k) > 2:
+                        events_found.append(1, j, rj, rk)
 
         return events_found
 
@@ -227,12 +227,12 @@ class KMCModel:
         self.etree = EventTree(rates)
         self.etree.update_events(n_events)
 
-        #print('events',len(event_list), np.random.choice(np.random.choice(event_list, 2), 5))
-        #print(self.etree.event_tree[-1])
-        #print('-------')
-        #print([[(e['type'], e['final']) for e in et] for et in event_list])
-        #print('-------')
-        #print('site dict', site_dict)
+        print('events',len(event_list), np.random.choice(np.random.choice(event_list, 2), 5))
+        print(self.etree.event_tree[-1])
+        print('-------')
+        print([[(e['type'], e['final']) for e in et] for et in event_list])
+        print('-------')
+        print('site dict', site_dict)
 
 
     def move(self, event_type, event_number):
@@ -251,14 +251,17 @@ class KMCModel:
         new_events = []
         n_events = self.etree.n_events
 
-        #print('# event types:', event_type, len(self.event_list))
-        #for i in range(len(self.event_list)):
-        #    #print('# start events: #', i, len(self.event_list[i]), n_events[i])
-        #    assert len(self.event_list[i]) == n_events[i], f'Number of events of type {i} does not match: {len(self.event_list[i])} vs. {n_events[i]}' 
+        print('# event types:', len(self.event_list))
+        for i in range(len(self.event_list)):
+            print('# start events: #', i, len(self.event_list[i]), n_events[i])
+            assert len(self.event_list[i]) == n_events[i], f'Number of events of type {i} does not match: {len(self.event_list[i])} vs. {n_events[i]}' 
 
         # deposition event
         if event_type == 0:
             ri = event['final']
+
+            # search neighbors and grain numbers
+            neighbors, grain_numbers = self.find_neighbors(ri)
 
             # create a new atom
             self.xyz.append(np.array(ri)) 
@@ -266,9 +269,6 @@ class KMCModel:
 
             # put it on a lattice
             self.latt[tuple(self.xyz[-1])] = iatom # atom number to lattice
-
-            # search neighbors and grain numbers
-            neighbors, grain_numbers = self.find_neighbors(ri)
 
             # assign a new grain number to the atom
             self.grain.append(self.get_grain(grain_numbers))
@@ -278,18 +278,8 @@ class KMCModel:
             # remove the current deposition event
             old_events.append((event_type, event_number))
             # ... and the associated dictionary of site events
-            #!!! FIX
-            #del self.site_dict[ri]
+            del self.site_dict[ri]
             n_events[0] -= 1
-
-            # find events of the moved atom
-            events_found = self.find_events(iatom, ri)
-
-            # update site dict and new_events list cycle through new events
-            for ev in events_found:
-                new_events.append(ev)
-                n_events[ev[0]] += 1
-
 
             # remove all old events of the old and new neighbors
             # and add new events
@@ -311,49 +301,86 @@ class KMCModel:
                     new_events.append(ev)
                     n_events[ev[0]] += 1
 
+            # remove diffusion events of neighbors
+            for j, rj in neighbors:
+
+                # only for real atoms (not vacant sites)
+                if j < 1:
+                    continue
+
+                # cycle over events associated with the neighbor
+                # and find events that end at the deposition spot
+                estart = len(old_events)
+                for et, en in self.site_dict[j]:
+                    if self.event_list[et][en]['final'] == ri:
+                        old_events.append((et, en))
+
+                # remove old events from site list
+                for e in range(estart, len(old_events)): 
+                    self.site_dict[j].remove(old_events[e])
+                    n_events[1] -= 1
+
+                if len(self.site_dict[j]) == 0:
+                    del self.site_dict[j]
+
+            # Scan potential targets for diffusion and deposition
+            for j, rj in neighbors:
+
+                if j != 0:
+                    continue
+
+                # count number of neighbors in the target position
+                # the newly deposited atom already present on lattice
+                _, new_grain_numbers = self.find_neighbors(rj)
+
+                # if number of real atoms 3 or more, make vacancy available as
+                # a destination for deposition and diffusion
+                if len(new_grain_numbers) > 2:
+                    # create a diffusion event for the new atom
+                    new_events.append((1, iatom, ri, rj))
+                    n_events[1] += 1
+
+                    # create a deposition event for the updated configuration
+                    new_events.append((0, rj, rj, rj))
+                    n_events[0] += 1
+
+                    # check if neighbor
+                    events_found = self.find_events(j, rj)
+
+                    # update site dict and new_events list cycle through new events
+                    for ev in events_found:
+                        new_events.append(ev)
+                        n_events[ev[0]] += 1
+
         elif event_type == 1: # diffusion
-            r0 = event['initial']
-            ri = event['final']
+            ri = event['initial']
+            rj = event['final']
 
             # identify atom (to access associated events)
-            iatom = self.latt[r0]
+            iatom = self.latt[ri]
 
             # search neighbors of the initial state
-            neighbors_old, _ = self.find_neighbors(r0)
+            neighbors_old, _ = self.find_neighbors(ri)
 
             # create move atom to the new position
-            self.latt[tuple(r0)] = 0
-            self.latt[tuple(ri)] = iatom
-            self.xyz[iatom-1] = ri
+            self.latt[tuple(ri)] = 0
+            self.latt[tuple(rj)] = iatom
+            self.xyz[iatom-1] = rj
 
             # remove all current events of atom iatom
             for et, en in self.site_dict[iatom]:
-                self.site_dict[iatom].remove((et, en))
                 old_events.append((et, en))
+                self.site_dict[iatom].remove((et, en))
                 n_events[et] -= 1
 
             if len(self.site_dict[iatom]) == 0:
                 del self.site_dict[iatom]
 
-            # remove all current events of the destination vacancy
-            for et, en in self.site_dict[ri]:
-                self.site_dict[ri].remove((et, en))
-                old_events.append((et, en))
-                n_events[et] -= 1
-
-            # find events of the moved atom
-            events_found = self.find_events(iatom, ri)
-
-            # update site dict and new_events list cycle through new events
-            for ev in events_found:
-                new_events.append(ev)
-                n_events[ev[0]] += 1
-
             # search neighbors and grain numbers for final state 
-            neighbors_new, grain_numbers = self.find_neighbors(ri)
+            neighbors_new, grain_numbers = self.find_neighbors(rj)
 
             # assign a new grain number to the atom
-            self.grain[iatom-1] = self.get_grain(grain_numbers)
+            self.grain[iatom-1] = get_grain(grain_numbers)
 
             # combine all neighbors (old and new)
             neighbors = list(set(neighbors_old + neighbors_new))
@@ -364,8 +391,8 @@ class KMCModel:
 
                 # remove all current events of neighbor j
                 for et, en in self.site_dict[j]:
-                    self.site_dict[j].remove((et, en))
                     old_events.append((et, en))
+                    self.site_dict[j].remove((et, en))
                     n_events[et] -= 1
 
                 if len(self.site_dict[j]) == 0:
@@ -397,8 +424,8 @@ class KMCModel:
             self.event_list[ev[0]].append(n_event)
             self.site_dict[ev[1]].append((ev[0], len(self.event_list[ev[0]])-1 ))
 
-        #for i in range(len(self.event_list)):
-        #    assert len(self.event_list[i]) == n_events[i], f'Number of events of type {i} does not match: {len(self.event_list[i])} vs. {n_events[i]}' 
+        for i in range(len(self.event_list)):
+            assert len(self.event_list[i]) == n_events[i], f'Number of events of type {i} does not match: {len(self.event_list[i])} vs. {n_events[i]}' 
 
         # update atom count
         self.nat = len(self.xyz)
@@ -432,10 +459,11 @@ class KMCModel:
 
         # return a random event (based on their frequency)
         event_type, event_number = self.etree.find_event()
+        print('Event', event_type, event_number)
 
         # perform a step prescribed by the event and return lists of affected events
         n_events = self.move(event_type, event_number)
-
+ 
         # update binary search tree
         self.etree.update_events(n_events)
  
