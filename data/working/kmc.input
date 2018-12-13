@@ -1,0 +1,8 @@
+time: 1.0
+print_period: 10.0
+save_traj_period: 10.0
+param_file: params
+incfg_file: ni.xyz
+outcfg_file: output.xyz
+trj_file: kmc.trj
+stats_file: statistics.dat
