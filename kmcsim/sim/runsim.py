@@ -10,6 +10,7 @@
 import sys
 import os
 import re
+import random
 import numpy as np
 #import model
 #import io
@@ -73,7 +74,7 @@ class RunSim:
             self.stats_file = os.path.join(path, re.findall('\S+', f.readline())[-1])
 
 
-    def init_sim(self):
+    def init_sim(self, random_seed=42):
         """
         Initialize KMC simulation: build model and set its parameters
         """
@@ -91,9 +92,12 @@ class RunSim:
         # make event list (e.g., identify deposition sites)
         self.kmc.init_events(rates)
 
+        # initialize random number generator
+        random.seed(random_seed)
 
 
-    def run(self, random_seed=42):
+
+    def run(self):
         """
         Run KMC simulation
         """
